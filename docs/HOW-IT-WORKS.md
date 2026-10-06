@@ -114,7 +114,8 @@ Visitor            Widget (browser)             Token server                  We
 | `webexClient.js` | `ServiceAppTokenProvider`: returns the Service App access token. It runs in one of two modes: a **static** token (quick PoC) or **refresh** mode, which uses client id + secret + refresh token, renews automatically 5 min before expiry and shares one refresh across concurrent requests. `WebexClient`: the two Webex calls above. On errors it keeps the Webex `trackingid` for Cisco TAC. |
 | `rateLimiter.js` | Limits sessions per client IP (default 5 per 10 min). This stops bots from flooding the queue or burning guest tokens. |
 | `app.js` | Routes (table below), security checks, error handling and static hosting of the widget and test page. |
-| `index.js` | Wires everything together and starts the HTTP server. |
+| `index.js` | Wires everything together and starts the HTTP server (local, Docker, Cloud Run service). |
+| `function.js` | Same wiring, exported as the `clickToCall` handler for Google Cloud Run functions. |
 | `scripts/check-setup.js` | `npm run check`: runs every Webex call with the real credentials, says which setup step is missing, and gives a hint for each failure. |
 
 Routes:
@@ -165,7 +166,7 @@ analytics. The test page uses them for its live console. Branding is done with C
   without manual work. The refresh token itself also expires eventually. Calendar a reminder, or re-authorise
   the Service App before then. Keep the secrets in a secret manager (Key Vault, AWS Secrets Manager, Vault).
 - **Several instances.** The rate limiter is in memory, per instance. Behind a load balancer, set
-  `TRUST_PROXY=true` and use the gateway's or WAF's rate limiting, or a shared store.
+  `TRUST_PROXY` to the number of proxies (1 on Cloud Run) and use the gateway's or WAF's rate limiting (e.g. Cloud Armor), or a shared store.
 - **Business hours.** Handle closed hours in the Customer Assist queue / auto attendant schedule. You can also
   hide the button on the website outside hours.
 - **Browser support.** Use current Chrome, Edge, Firefox or Safari (WebRTC). Corporate networks must allow

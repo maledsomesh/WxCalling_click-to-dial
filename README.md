@@ -50,6 +50,7 @@ Add the website's origin to `ALLOWED_ORIGINS` (for example `https://www.example.
 ```
 server/
   index.js          entry point: load config, start HTTP server
+  function.js       entry point for Google Cloud Run functions (clickToCall)
   config.js         .env loading + validation (fails fast on missing settings)
   app.js            HTTP routes: session API, diagnostics, static files
   webexClient.js    Webex REST calls + Service App token refresh

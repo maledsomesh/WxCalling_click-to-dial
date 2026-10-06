@@ -19,6 +19,8 @@ export function loadDotEnv(path = '.env') {
 
 const bool = (v, dflt) => (v === undefined || v === '' ? dflt : /^(1|true|yes)$/i.test(v));
 const int = (v, dflt) => (v === undefined || v === '' ? dflt : Number.parseInt(v, 10));
+// TRUST_PROXY: false/0 = use the socket address, true = 1 proxy hop, N = N hops.
+const hops = (v) => (v === undefined || v === '' ? 0 : /^(true|yes)$/i.test(v) ? 1 : Number.parseInt(v, 10) || 0);
 const list = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
 export function buildConfig(env = process.env) {
@@ -45,7 +47,7 @@ export function buildConfig(env = process.env) {
       allowedOrigins: list(env.ALLOWED_ORIGINS),
       rateLimitMax: int(env.RATE_LIMIT_MAX, 5),
       rateLimitWindowMs: int(env.RATE_LIMIT_WINDOW_SECONDS, 600) * 1000,
-      trustProxy: bool(env.TRUST_PROXY, false),
+      trustProxyHops: hops(env.TRUST_PROXY),
       diagnosticsKey: env.DIAGNOSTICS_KEY || '',
     },
   };

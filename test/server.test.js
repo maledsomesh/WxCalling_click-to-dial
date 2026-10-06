@@ -156,3 +156,26 @@ test('serves the widget and blocks path traversal', async () => {
     await t.close();
   }
 });
+
+test('TRUST_PROXY uses the rightmost hop so forged X-Forwarded-For cannot dodge the rate limit', async () => {
+  const t = await startTestServer({ env: { TRUST_PROXY: 'true', RATE_LIMIT_MAX: '1' } });
+  try {
+    // Same real client (appended by the proxy), different forged left-hand entries.
+    assert.equal((await post(t.base, {}, { 'X-Forwarded-For': '1.1.1.1, 203.0.113.9' })).status, 200);
+    assert.equal((await post(t.base, {}, { 'X-Forwarded-For': '2.2.2.2, 203.0.113.9' })).status, 429);
+    // A different real client is not affected.
+    assert.equal((await post(t.base, {}, { 'X-Forwarded-For': '203.0.113.10' })).status, 200);
+  } finally {
+    await t.close();
+  }
+});
+
+test('TRUST_PROXY=2 picks the client in front of a load balancer', async () => {
+  const t = await startTestServer({ env: { TRUST_PROXY: '2', RATE_LIMIT_MAX: '1' } });
+  try {
+    assert.equal((await post(t.base, {}, { 'X-Forwarded-For': '9.9.9.9, 203.0.113.9, 130.211.0.1' })).status, 200);
+    assert.equal((await post(t.base, {}, { 'X-Forwarded-For': '8.8.8.8, 203.0.113.9, 130.211.0.2' })).status, 429);
+  } finally {
+    await t.close();
+  }
+});

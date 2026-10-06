@@ -47,12 +47,16 @@ export function createApp({ config, webex, logger = console, limiter }) {
     res.end(payload);
   }
 
+  // Behind N trusted proxies the real client is the Nth X-Forwarded-For entry
+  // from the right. Entries further left are supplied by the client and can be
+  // forged, so they must never be used for rate limiting.
   function clientIp(req) {
-    if (server.trustProxy) {
-      const fwd = req.headers['x-forwarded-for'];
-      if (fwd) return String(fwd).split(',')[0].trim();
+    const n = server.trustProxyHops;
+    if (n > 0) {
+      const ips = String(req.headers['x-forwarded-for'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+      if (ips.length >= n) return ips[ips.length - n];
     }
-    return req.socket.remoteAddress || 'unknown';
+    return req.socket?.remoteAddress || 'unknown';
   }
 
   // Same-origin requests are always allowed; cross-origin only from ALLOWED_ORIGINS.
@@ -82,6 +86,19 @@ export function createApp({ config, webex, logger = console, limiter }) {
   }
 
   async function readJson(req) {
+    // Hosts such as Google Cloud Run functions (Functions Framework / Express)
+    // have already parsed the body and consumed the stream.
+    if (req.body !== undefined) {
+      if (Buffer.isBuffer(req.body) || typeof req.body === 'string') {
+        if (req.body.length > MAX_BODY_BYTES) throw Object.assign(new Error('Body too large'), { status: 413, expose: true });
+        try {
+          return req.body.length ? JSON.parse(req.body.toString()) : {};
+        } catch {
+          throw Object.assign(new Error('Invalid JSON'), { status: 400, expose: true });
+        }
+      }
+      return req.body && typeof req.body === 'object' ? req.body : {};
+    }
     let size = 0;
     const chunks = [];
     for await (const chunk of req) {

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Browser-based guest click-to-call for Webex Calling Customer Assist: token server and embeddable call widget",
   "type": "module",
+  "main": "server/function.js",
   "private": true,
   "engines": {
     "node": ">=20"
