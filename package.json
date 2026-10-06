@@ -1,0 +1,17 @@
+{
+  "name": "wxcalling-click-to-call",
+  "version": "1.0.0",
+  "description": "Browser-based guest click-to-call for Webex Calling Customer Assist: token server and embeddable call widget",
+  "type": "module",
+  "main": "server/function.js",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node scripts/check-setup.js",
+    "test": "node --test"
+  },
+  "license": "MIT"
+}
