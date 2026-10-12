@@ -90,7 +90,7 @@ Expected output:
 
 ```
 ✓ .env configuration is complete
-✓ Service App access token  [refresh-token (auto renew)]
+✓ Service App access token  [static access token]   (or: refresh-token (auto renew))
 ✓ Guest token  (POST /v1/guests/token)  [expiresIn=...s]
 ✓ Call token   (POST /v1/telephony/click2call/callToken)  [destination=+1...]
 All checks passed
@@ -142,8 +142,9 @@ It runs unchanged on Azure App Service, AWS App Runner / ECS, Google Cloud Run, 
 reverse proxy. Requirements:
 
 - **HTTPS** in front, terminated at a load balancer or reverse proxy. Set `TRUST_PROXY` to the number of proxies.
-- **Secrets** (client secret, refresh token) come from the platform's secret store as environment variables.
-  Never commit `.env`.
+- **Credentials** (the Service App token) are passed as environment variables. Never commit `.env`. Anyone who
+  can view the service's configuration can read them, so limit who has that access. A secret store is an
+  optional extra (see *Production considerations* in [HOW-IT-WORKS.md](HOW-IT-WORKS.md)).
 - **Outbound access** to `https://webexapis.com`.
 - **Health probe:** `GET /healthz`.
 - **Several instances:** the built-in rate limit is per instance. Add rate limiting and bot protection at
@@ -156,21 +157,19 @@ Two options. Both give you HTTPS automatically and need no code changes.
 **Cloud Run service (recommended)**, built from the included `Dockerfile`:
 
 ```bash
-gcloud secrets create webex-c2c-client-secret --data-file=-   # paste secret, then Ctrl-D
-gcloud secrets create webex-c2c-refresh-token --data-file=-
+read -s -p "Service App access token: " TOKEN; echo
 gcloud run deploy webex-c2c --source . --region europe-west1 --allow-unauthenticated \
-  --min-instances 1 \
-  --set-env-vars WEBEX_CLIENT_ID=...,C2C_DESTINATION=...,TRUST_PROXY=1,ALLOWED_ORIGINS=https://www.customer.com \
-  --set-secrets WEBEX_CLIENT_SECRET=webex-c2c-client-secret:latest,WEBEX_REFRESH_TOKEN=webex-c2c-refresh-token:latest
+  --set-env-vars "WEBEX_SERVICE_APP_ACCESS_TOKEN=$TOKEN,C2C_DESTINATION=+15551234567,TRUST_PROXY=1"
 ```
+
+Step by step, including Cloud Shell and GitHub access, in [CLOUD-RUN-DEPLOY.md](CLOUD-RUN-DEPLOY.md).
 
 **Cloud Run functions**: the entry point is `clickToCall` in `server/function.js` (`main` in `package.json`).
 
 ```bash
 gcloud functions deploy webex-c2c --gen2 --runtime nodejs22 --region europe-west1 \
   --source . --entry-point clickToCall --trigger-http --allow-unauthenticated \
-  --min-instances 1 \
-  --set-env-vars ... --set-secrets ...      # same values as above
+  --set-env-vars "WEBEX_SERVICE_APP_ACCESS_TOKEN=$TOKEN,C2C_DESTINATION=+15551234567,TRUST_PROXY=1"
 ```
 
 Points that matter on Cloud Run:
@@ -181,7 +180,7 @@ Points that matter on Cloud Run:
 | `TRUST_PROXY` | **Must** be `1` (or `2` behind an external load balancer). Otherwise every visitor appears to come from Google's front-end IP and shares one rate-limit bucket, so the whole site gets 5 calls per 10 minutes. After deploying, place a call and check the `ip` in the `session created` log line is your public IP. |
 | Rate limiting | The built-in limiter is per instance, and instances come and go, so treat it as a safety net. For real protection put an external Application Load Balancer with **Cloud Armor** rate limiting / bot management in front (then `TRUST_PROXY=2`). |
 | Cold starts | Scale-to-zero adds a few seconds to the first call. `--min-instances 1` keeps one instance warm (small monthly cost). |
-| Secrets | Use Secret Manager (`--set-secrets`), never a `.env` file in the source upload. The included `.gcloudignore` keeps `.env` out of the upload. |
+| Token | Passed as the environment variable `WEBEX_SERVICE_APP_ACCESS_TOKEN`. It expires, so replace it before then without rebuilding: `gcloud run services update webex-c2c --region REGION --update-env-vars WEBEX_SERVICE_APP_ACCESS_TOKEN=NEW_TOKEN`. Never use a `.env` file in the source upload; the included `.gcloudignore` keeps it out. |
 | Egress | Needs outbound HTTPS to `webexapis.com`. The default works; if you route all egress through a VPC, make sure Cloud NAT is set up. |
 | Custom domain | Map e.g. `c2c.customer.com` to the service and use it as `data-api-base`. |
 

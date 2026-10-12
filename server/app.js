@@ -204,7 +204,8 @@ export function createApp({ config, webex, logger = console, limiter }) {
       // Only our own request-validation errors are shown to the browser; Webex
       // failures are logged with their trackingId and reported generically.
       const status = err.expose ? err.status : 502;
-      log('error', err.message, { path: pathname, webexStatus: err.expose ? undefined : err.status, trackingId: err.trackingId });
+      const hint = !err.expose && err.status === 401 ? 'Service App token rejected or expired: set a new WEBEX_SERVICE_APP_ACCESS_TOKEN' : undefined;
+      log('error', err.message, { path: pathname, webexStatus: err.expose ? undefined : err.status, trackingId: err.trackingId, hint });
       if (!res.headersSent) {
         send(res, status, { error: status === 502 ? 'The call service is unavailable. Please try again later.' : err.message });
       }

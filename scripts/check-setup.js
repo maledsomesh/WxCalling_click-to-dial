@@ -29,7 +29,7 @@ for (const s of result.steps) {
     console.log(`✗ ${s.step}\n    ${s.error}${s.trackingId ? `\n    Webex trackingId: ${s.trackingId}` : ''}`);
     const hint =
       s.status === 401
-        ? 'The Service App access token is invalid or expired. Regenerate it in the Developer Portal, or configure the refresh-token option.'
+        ? 'The Service App access token is invalid or expired. Generate a new one in the Developer Portal and update WEBEX_SERVICE_APP_ACCESS_TOKEN.'
         : s.status === undefined && !s.trackingId
           ? 'Network problem: check this server can reach https://webexapis.com (proxy / firewall egress rules).'
           : Object.entries(HINTS).find(([k]) => s.step.startsWith(k))?.[1];

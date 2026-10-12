@@ -162,9 +162,14 @@ analytics. The test page uses them for its live console. Branding is done with C
 ## 7. Production considerations
 
 - **HTTPS is mandatory.** Browsers block microphone access on plain HTTP, except on `localhost`.
-- **Service App token lifetime.** Use refresh mode (`WEBEX_CLIENT_ID`/`SECRET`/`REFRESH_TOKEN`) so tokens renew
-  without manual work. The refresh token itself also expires eventually. Calendar a reminder, or re-authorise
-  the Service App before then. Keep the secrets in a secret manager (Key Vault, AWS Secrets Manager, Vault).
+- **Service App token lifetime.** Two modes. **Static** (`WEBEX_SERVICE_APP_ACCESS_TOKEN`): simple, but the
+  token expires and someone must replace it before then; when it expires, calls fail and the server log says
+  so. **Refresh** (`WEBEX_CLIENT_ID`/`SECRET`/`REFRESH_TOKEN`): the server renews the token itself, which is
+  better for anything long-lived. The refresh token also expires eventually, so re-authorise the Service App
+  before then.
+- **Where credentials live.** Environment variables are the simplest and are what the lab setup uses, but anyone
+  who can view the service configuration can read them. For production, consider a secret store (Google Secret
+  Manager, Azure Key Vault, AWS Secrets Manager, Vault) and restrict who can view the service.
 - **Several instances.** The rate limiter is in memory, per instance. Behind a load balancer, set
   `TRUST_PROXY` to the number of proxies (1 on Cloud Run) and use the gateway's or WAF's rate limiting (e.g. Cloud Armor), or a shared store.
 - **Business hours.** Handle closed hours in the Customer Assist queue / auto attendant schedule. You can also

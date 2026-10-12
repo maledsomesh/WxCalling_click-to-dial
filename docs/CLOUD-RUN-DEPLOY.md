@@ -1,7 +1,10 @@
-# Deploy to Google Cloud Run (from Cloud Shell + console)
+# Deploy to Google Cloud Run (all from Cloud Shell)
 
-Follow the parts in order. Each part ends with a **Check**. Do not move on until the check passes.
-No admin rights are needed on your laptop: everything runs in Cloud Shell or the Google Cloud console.
+Follow the parts in order. Each part ends with a **Check**. Do not move on until it passes.
+Everything runs in **Google Cloud Shell**: no admin rights are needed on your laptop, and Cloud Run does not
+need to be connected to GitHub. You copy the code into Cloud Shell and deploy it with one command.
+
+The Webex token is passed to the service as a plain **environment variable** (no Secret Manager).
 
 ---
 
@@ -11,99 +14,95 @@ No admin rights are needed on your laptop: everything runs in Cloud Shell or the
 |---|---|---|
 | Google Cloud **project ID** | Console, project picker | `my-project-123` |
 | **Region** | Pick one close to your users | `europe-west1` |
-| Service App **Client ID** | developer.webex.com, My Webex Apps, your Service App | `C1234...` |
-| Service App **Client Secret** | Same page (shown once when created) | `abcd...` |
-| Service App **Refresh token** | Developer Portal, after the admin has authorised the Service App in Control Hub | `NzE...` |
-| **Destination number** | Number of your Customer Assist queue or auto attendant | `+15551234567` |
+| Service App **access token** | developer.webex.com, your Service App, after a Control Hub admin has authorised it | `NzE...` |
+| **Destination number** | Customer Assist queue or auto attendant number | `+15551234567` |
+| **Diagnostics key** (optional) | Make up a long random string. Enables the `/api/diagnostics` check. | |
 
-If the Service App is not ready yet, finish Phase 1 and 2 of [SETUP-GUIDE.md](SETUP-GUIDE.md) first.
+If the Service App is not ready yet, do Phase 1 and 2 of [SETUP-GUIDE.md](SETUP-GUIDE.md) first.
+
+The access token **expires**. Its expiry is shown where you generate it. See *Replacing the token* below.
 
 ---
 
 ## Part 1: Prepare the project (Cloud Shell)
 
-Open Cloud Shell (the `>_` icon, top right of the console) and run:
+Open Cloud Shell (the `>_` icon, top right of the console):
 
 ```bash
 gcloud config set project YOUR_PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
-  secretmanager.googleapis.com artifactregistry.googleapis.com
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
 ```
 
-**Check:** the command ends without errors (it can take a minute).
+**Check:** no errors.
 
 ---
 
-## Part 2: Store the Webex secrets (Cloud Shell)
+## Part 2: Get the code into Cloud Shell
 
-Each command asks you to paste a value. Nothing is shown on screen or saved in shell history.
+Try this first:
 
 ```bash
-read -s -p "Webex Client Secret: " V; echo; printf '%s' "$V" | gcloud secrets create webex-client-secret --data-file=-; unset V
-read -s -p "Webex Refresh Token: " V; echo; printf '%s' "$V" | gcloud secrets create webex-refresh-token --data-file=-; unset V
-read -s -p "Diagnostics key (make up a long random string): " V; echo; printf '%s' "$V" | gcloud secrets create c2c-diagnostics-key --data-file=-; unset V
+cd ~
+git clone https://github.com/maledsomesh/WxCalling_click-to-dial.git
+cd WxCalling_click-to-dial
+git checkout main && git pull
+ls
 ```
 
-Write down your diagnostics key. You need it in Part 5.
+**Check:** `ls` shows `Dockerfile`, `server`, `public`, `package.json`.
 
-Now let the Cloud Run service read these secrets:
+If you get "Repository not found", or it asks for a username and password, the repo is private. Sign in with
+**one** of these, then clone again.
+
+**Option A: GitHub CLI** (already in Cloud Shell)
 
 ```bash
-PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format='value(projectNumber)')
-for S in webex-client-secret webex-refresh-token c2c-diagnostics-key; do
-  gcloud secrets add-iam-policy-binding $S \
-    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
-    --role=roles/secretmanager.secretAccessor
-done
+gh auth login
 ```
 
-**Check:** `gcloud secrets list` shows the three secrets.
+Choose `GitHub.com`, `HTTPS`, `Yes` to authenticate Git, `Login with a web browser`. Open
+https://github.com/login/device, enter the code it shows, and approve. Then:
+
+```bash
+gh repo clone maledsomesh/WxCalling_click-to-dial && cd WxCalling_click-to-dial
+```
+
+**Option B: Personal access token**
+
+1. GitHub: **Settings, Developer settings, Personal access tokens, Fine-grained tokens, Generate new token**.
+2. Repository access: only `WxCalling_click-to-dial`. Permission: **Contents: Read-only**. Short expiry.
+3. In Cloud Shell: `git clone https://github.com/maledsomesh/WxCalling_click-to-dial.git`. Username is your
+   GitHub name; for the password paste the token.
 
 ---
 
-## Part 3: Create the service (console)
+## Part 3: Deploy (one command)
 
-1. Open **Cloud Run**, then **Deploy container**, then **Web service**.
-2. Select **Continuous deployment from a repository**, then **Set up with Cloud Build**.
-3. Authorise GitHub when asked, and pick `maledsomesh/WxCalling_click-to-dial`.
-4. Branch: `main`.
-5. Build type: **Dockerfile**. Source location: `/Dockerfile`. Click **Save**.
-6. Fill in the service settings:
+Run it from inside the `WxCalling_click-to-dial` folder. The first line asks for the token without showing it
+or saving it in your shell history.
 
-   | Setting | Value |
-   |---|---|
-   | Service name | `webex-c2c` |
-   | Region | your region from Part 0 |
-   | Authentication | **Allow public access** (website visitors have no Google login) |
-   | Billing | Request-based |
-   | Minimum instances | `1` avoids a slow first call (small monthly cost). `0` is fine for a lab. |
+```bash
+read -s -p "Service App access token: " TOKEN; echo
+gcloud run deploy webex-c2c \
+  --source . \
+  --region YOUR_REGION \
+  --allow-unauthenticated \
+  --set-env-vars "WEBEX_SERVICE_APP_ACCESS_TOKEN=$TOKEN,C2C_DESTINATION=YOUR_NUMBER,TRUST_PROXY=1,DIAGNOSTICS_KEY=YOUR_KEY"
+```
 
-7. Expand **Container(s), Volumes, Networking, Security**. Leave the port at its default.
-8. On the **Variables & secrets** tab, under **Environment variables**, add:
+What to expect:
 
-   | Name | Value |
-   |---|---|
-   | `WEBEX_CLIENT_ID` | your Client ID |
-   | `C2C_DESTINATION` | your destination number |
-   | `TRUST_PROXY` | `1` |
+- First time, it asks to create an Artifact Registry repository `cloud-run-source-deploy`. Answer **`Y`**.
+- It builds the image from the `Dockerfile` and deploys (a few minutes).
+- It ends with `Service URL: https://webex-c2c-....run.app`.
 
-   Leave `ALLOWED_ORIGINS` out for now (Part 6).
+Notes:
 
-9. Under **Secrets**, click **Reference a secret** three times. For each, set **Exposed as** to **Environment variable**, and version `latest`:
+- `--allow-unauthenticated` is required: website visitors have no Google login.
+- `TRUST_PROXY=1` is required on Cloud Run, otherwise all visitors share one rate limit.
+- Optional: `--min-instances 1` avoids a slow first call after idle time (small monthly cost).
 
-   | Secret | Environment variable name |
-   |---|---|
-   | `webex-client-secret` | `WEBEX_CLIENT_SECRET` |
-   | `webex-refresh-token` | `WEBEX_REFRESH_TOKEN` |
-   | `c2c-diagnostics-key` | `DIAGNOSTICS_KEY` |
-
-10. Click **Create** and wait for the build and deploy (a few minutes).
-
-**Check:** the service page shows a green tick and a URL ending in `.run.app`.
-
----
-
-## Part 4: Check that the service is up (Cloud Shell)
+**Check:**
 
 ```bash
 URL=$(gcloud run services describe webex-c2c --region YOUR_REGION --format='value(status.url)')
@@ -111,79 +110,107 @@ echo $URL
 curl $URL/healthz
 ```
 
-**Check:** the output is `{"status":"ok"}`.
+You want `{"status":"ok"}`.
 
 ---
 
-## Part 5: Check the Webex connection (Cloud Shell)
+## Part 4: Check the Webex connection
 
 ```bash
-read -s -p "Diagnostics key: " K; echo
-curl -s -H "X-Diagnostics-Key: $K" $URL/api/diagnostics
+curl -s -H "X-Diagnostics-Key: YOUR_KEY" $URL/api/diagnostics
 ```
 
-**Check:** you see `"ok":true` and three steps that all say `"ok":true`.
-
-If a step fails, read its `error` message:
+**Check:** `"ok":true` with all three steps `"ok":true`.
 
 | Failing step | Likely cause |
 |---|---|
-| Service App access token (401) | Wrong client id / secret / refresh token, or the Service App is not authorised in Control Hub |
-| Guest token (403) | Service App is missing the `guest-issuer:read` and `guest-issuer:write` scopes |
-| Call token (400 / 403) | Click-to-call is not enabled in Control Hub, the click-to-call scope is missing, there is no Customer Assist license, or `C2C_DESTINATION` is not click-to-call enabled |
-
-After fixing it on the Webex side, run the same `curl` again. For a changed secret or variable, use **Edit & deploy new revision** in the console.
+| Service App access token / Guest token (401) | The token is wrong or expired. Generate a new one and replace it (below). |
+| Guest token (403) | Service App is missing the `guest-issuer:read` and `guest-issuer:write` scopes, or is not authorised |
+| Call token (400 / 403) | Click-to-call not enabled in Control Hub, click-to-call scope missing, no Customer Assist license, or the destination is not click-to-call enabled |
 
 ---
 
-## Part 6: Place a test call
+## Part 5: Place a test call
 
 1. Sign in to the **Webex App** as an agent of the destination queue and set yourself available.
-2. On your laptop, open the `https://...run.app` address from Part 4.
-3. Click **Call us**, enter a name, click **Start call**, and allow the microphone.
-4. The agent's Webex App rings. Answer it and check you can hear each other both ways.
-5. Try **Mute**, **Hold**, **Keypad** and **End call**.
-
-Then check the logs in Cloud Shell:
+2. On your laptop open the `https://...run.app` address.
+3. Click **Call us**, enter a name, click **Start call**, allow the microphone.
+4. The agent's Webex App rings. Answer and check two-way audio. Try Mute, Hold, Keypad, End call.
 
 ```bash
 gcloud run services logs read webex-c2c --region YOUR_REGION --limit 20
 ```
 
-**Check:** a `session created` line appears, and its `ip` is your own public IP. If the `ip` is a Google address, `TRUST_PROXY` is not set to `1`.
+**Check:** a `session created` line appears, and its `ip` is **your own public IP**. If it is a Google
+address, `TRUST_PROXY` is not `1`.
 
 ---
 
-## Part 7: Put the button on the customer's website
+## Part 6: Put the button on the customer's website
 
-1. Console, Cloud Run, `webex-c2c`, **Edit & deploy new revision**, add the variable
-   `ALLOWED_ORIGINS` = `https://www.customer.com` (the exact website address, no trailing slash).
-   Several addresses can be separated by commas. Deploy.
-2. Add these lines to the website pages:
+Add the website address to the allow-list. Use `--update-env-vars`, which changes only the variables you name:
 
-   ```html
-   <link rel="stylesheet" href="https://YOUR-SERVICE-URL/c2c-widget.css">
-   <script src="https://YOUR-SERVICE-URL/c2c-widget.js"
-           data-api-base="https://YOUR-SERVICE-URL" data-label="Call us" defer></script>
-   ```
+```bash
+gcloud run services update webex-c2c --region YOUR_REGION \
+  --update-env-vars "ALLOWED_ORIGINS=https://www.customer.com"
+```
 
-**Check:** the button appears on the website and a test call connects.
+Use the exact website address (no trailing slash). For several addresses use a different separator so the
+comma is not misread: `--update-env-vars "^@^ALLOWED_ORIGINS=https://a.com,https://b.com"`.
+
+Then add to the website pages:
+
+```html
+<link rel="stylesheet" href="https://YOUR-SERVICE-URL/c2c-widget.css">
+<script src="https://YOUR-SERVICE-URL/c2c-widget.js"
+        data-api-base="https://YOUR-SERVICE-URL" data-label="Call us" defer></script>
+```
 
 ---
 
-## What happens when you change the code
+## Replacing the token (when it expires)
 
-The service rebuilds and redeploys on every push to `main`. Only merge finished work to `main`.
+No rebuild needed. This is the only change when the token expires:
+
+```bash
+read -s -p "New Service App access token: " TOKEN; echo
+gcloud run services update webex-c2c --region YOUR_REGION \
+  --update-env-vars "WEBEX_SERVICE_APP_ACCESS_TOKEN=$TOKEN"
+```
+
+Signs the token expired: test calls fail, diagnostics shows 401, and the Cloud Run log says
+`Service App token rejected or expired: set a new WEBEX_SERVICE_APP_ACCESS_TOKEN`. Write the expiry date
+somewhere you will see it.
+
+## Updating after code changes
+
+Cloud Run does not redeploy by itself. In Cloud Shell:
+
+```bash
+cd ~/WxCalling_click-to-dial && git pull
+gcloud run deploy webex-c2c --source . --region YOUR_REGION
+```
+
+Your existing variables are kept. Do **not** use `--set-env-vars` for small changes: it replaces all variables.
+Use `--update-env-vars`.
+
+## Security note
+
+Environment variables are visible to anyone who can view the service in the console or with `gcloud`. Keep
+that access limited. For production, consider a secret store (see *Production considerations* in
+[HOW-IT-WORKS.md](HOW-IT-WORKS.md)).
 
 ## Troubleshooting
 
 | Problem | What to do |
 |---|---|
-| Build fails with "no Dockerfile" | Check the branch is `main` and the build type is **Dockerfile** at `/Dockerfile` |
-| "Allow public access" is greyed out or refused | An organisation policy blocks public services. An org admin must allow it for this project. |
-| Service shows "Container failed to start" | Open the revision's **Logs**. The server prints which setting is missing, for example `Set C2C_DESTINATION`. |
-| Browser shows "Origin not allowed" | The website address is not in `ALLOWED_ORIGINS`, or has a typo or trailing slash |
-| Call fails with "Too many call attempts" | The per-visitor limit was reached (5 per 10 minutes). Wait, or raise `RATE_LIMIT_MAX`. |
+| `git clone`: "Repository not found" | The repo is private. Sign in with Option A or B in Part 2. |
+| Deploy: "Permission denied" on build or Artifact Registry | Ask a project admin for **Cloud Build Editor**, **Artifact Registry Writer** and **Service Account User** on the project |
+| Build fails with a permission error for the build account | Ask a project admin to give the Compute Engine default service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`) the role **Cloud Build Service Account** (`roles/cloudbuild.builds.builder`) |
+| `--allow-unauthenticated` refused, or the URL returns 403 | An organisation policy blocks public services. An org admin must allow it for this project. |
+| "Container failed to start" | Run the logs command in Part 5. The server prints which setting is missing, e.g. `Set C2C_DESTINATION`. |
+| Browser: "Origin not allowed" | The website address is missing from `ALLOWED_ORIGINS`, or has a typo or trailing slash |
+| "Too many call attempts" | Per-visitor limit reached (5 per 10 minutes). Wait, or raise `RATE_LIMIT_MAX`. |
 | Stuck on "Connecting..." | Webex traffic is blocked on the visitor's network. Try another network. |
 
-When you open a Cisco TAC case, include the `trackingId` from the Cloud Run logs.
+When opening a Cisco TAC case, include the `trackingId` from the Cloud Run logs.
