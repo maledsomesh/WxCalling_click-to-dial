@@ -179,3 +179,16 @@ test('TRUST_PROXY=2 picks the client in front of a load balancer', async () => {
     await t.close();
   }
 });
+
+test('an expired Service App token is logged with a clear hint and not exposed to the browser', async () => {
+  const fetchImpl = fakeWebexFetch({ '/v1/guests/token': () => json(401, { message: 'Invalid token' }, { trackingid: 'T_401' }) });
+  const t = await startTestServer({ fetchImpl });
+  try {
+    const res = await post(t.base, {});
+    assert.equal(res.status, 502);
+    assert.ok(!(await res.text()).includes('Invalid token'));
+    assert.ok(t.logs.some((l) => l.includes('WEBEX_SERVICE_APP_ACCESS_TOKEN') && l.includes('T_401')));
+  } finally {
+    await t.close();
+  }
+});

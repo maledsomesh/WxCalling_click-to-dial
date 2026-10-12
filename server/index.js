@@ -18,6 +18,9 @@ const server = createServer(createApp({ config, webex }));
 server.listen(config.server.port, () => {
   console.log(`Click-to-call server listening on http://localhost:${config.server.port}`);
   console.log(`  destination: ${config.c2c.destination}   token mode: ${tokens.canRefresh ? 'refresh' : 'static'}`);
+  if (!tokens.canRefresh) {
+    console.log('  note: static Service App token in use. It expires; replace WEBEX_SERVICE_APP_ACCESS_TOKEN before then.');
+  }
 });
 
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => process.exit(0)));

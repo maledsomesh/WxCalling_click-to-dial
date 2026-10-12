@@ -32,7 +32,9 @@ async function parseResponse(res, what) {
 }
 
 // Supplies a valid Service App access token. Uses the refresh-token grant when
-// client credentials are configured, otherwise the static token from .env.
+// client credentials are configured, otherwise the static token from the
+// WEBEX_SERVICE_APP_ACCESS_TOKEN environment variable (it expires: replace it
+// with a new one before then).
 export class ServiceAppTokenProvider {
   constructor(webexConfig, { fetchImpl = fetch, now = () => Date.now() } = {}) {
     this.cfg = webexConfig;
