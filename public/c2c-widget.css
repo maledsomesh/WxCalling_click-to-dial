@@ -1,0 +1,80 @@
+/* Webex Click-to-Call widget. Override the --c2c-* variables to match your brand. */
+.c2c-root {
+  --c2c-accent: #0a7c55;
+  --c2c-accent-text: #ffffff;
+  --c2c-danger: #c62828;
+  --c2c-bg: #ffffff;
+  --c2c-fg: #1d2125;
+  --c2c-muted: #5f6872;
+  --c2c-border: #d7dce1;
+  --c2c-surface: #f3f5f7;
+  --c2c-radius: 14px;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483000;
+  font: 15px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--c2c-fg);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  .c2c-root {
+    --c2c-accent: #34c38f;
+    --c2c-accent-text: #062b1d;
+    --c2c-danger: #ef6b6b;
+    --c2c-bg: #1f2428;
+    --c2c-fg: #eef1f3;
+    --c2c-muted: #a3acb5;
+    --c2c-border: #3a4148;
+    --c2c-surface: #2a3036;
+  }
+}
+.c2c-root [hidden] { display: none !important; }
+.c2c-root button { font: inherit; cursor: pointer; }
+.c2c-root button:disabled { opacity: 0.45; cursor: not-allowed; }
+.c2c-root button:focus-visible, .c2c-root input:focus-visible { outline: 3px solid var(--c2c-accent); outline-offset: 2px; }
+
+.c2c-launcher {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 20px; border: 0; border-radius: 999px;
+  background: var(--c2c-accent); color: var(--c2c-accent-text);
+  font-weight: 600; box-shadow: 0 6px 20px rgb(0 0 0 / 0.2);
+}
+.c2c-root[data-state='connected'] .c2c-launcher-icon { animation: c2c-pulse 1.6s infinite; }
+@keyframes c2c-pulse { 50% { opacity: 0.35; } }
+
+.c2c-panel {
+  width: min(320px, calc(100vw - 40px));
+  background: var(--c2c-bg); border: 1px solid var(--c2c-border);
+  border-radius: var(--c2c-radius); padding: 16px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 0.22);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.c2c-head { display: flex; justify-content: space-between; align-items: center; }
+.c2c-close { border: 0; background: none; color: var(--c2c-muted); font-size: 22px !important; line-height: 1; padding: 0 4px; }
+.c2c-statusrow { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.c2c-status { margin: 0; color: var(--c2c-muted); }
+.c2c-root[data-state='connected'] .c2c-status { color: var(--c2c-accent); font-weight: 600; }
+.c2c-root[data-state='error'] .c2c-status { color: var(--c2c-danger); }
+.c2c-timer { font-variant-numeric: tabular-nums; color: var(--c2c-muted); }
+.c2c-name input {
+  width: 100%; box-sizing: border-box; padding: 10px 12px;
+  border: 1px solid var(--c2c-border); border-radius: 10px;
+  background: var(--c2c-surface); color: var(--c2c-fg); font: inherit;
+}
+.c2c-btn {
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--c2c-border);
+  background: var(--c2c-surface); color: var(--c2c-fg); font-weight: 600;
+}
+.c2c-btn[aria-pressed='true'] { border-color: var(--c2c-accent); color: var(--c2c-accent); }
+.c2c-btn-call { background: var(--c2c-accent); color: var(--c2c-accent-text); border-color: transparent; }
+.c2c-btn-end { width: 100%; background: var(--c2c-danger); color: #fff; border-color: transparent; }
+.c2c-incall { display: flex; flex-direction: column; gap: 10px; }
+.c2c-controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.c2c-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.c2c-key { padding: 10px 0; border-radius: 10px; border: 1px solid var(--c2c-border); background: var(--c2c-surface); color: var(--c2c-fg); font-size: 18px !important; }
+.c2c-note { margin: 0; font-size: 12px; color: var(--c2c-muted); }
+@media (max-width: 480px) { .c2c-root { right: 16px; bottom: 16px; } }

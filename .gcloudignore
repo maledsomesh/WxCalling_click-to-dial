@@ -1,0 +1,8 @@
+# Files never uploaded by `gcloud run deploy --source` / `gcloud functions deploy`
+.gcloudignore
+.git
+.gitignore
+.env
+node_modules/
+test/
+docs/

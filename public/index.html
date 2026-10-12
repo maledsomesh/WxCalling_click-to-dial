@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Click-to-Call Test Page</title>
+  <link rel="stylesheet" href="c2c-widget.css">
+  <style>
+    :root { --bg: #f6f7f9; --fg: #1d2125; --muted: #5f6872; --card: #ffffff; --border: #d7dce1; --ok: #0a7c55; --err: #c62828; --code: #eef1f4; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #15191c; --fg: #eef1f3; --muted: #a3acb5; --card: #1f2428; --border: #3a4148; --ok: #34c38f; --err: #ef6b6b; --code: #2a3036; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+    main { max-width: 860px; margin: 0 auto; padding: 32px 16px 140px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    .lede { color: var(--muted); margin: 0 0 24px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    h2 { font-size: 1.05rem; margin: 0 0 12px; }
+    ol { margin: 0; padding-left: 20px; }
+    li { margin: 4px 0; }
+    code { background: var(--code); padding: 1px 6px; border-radius: 6px; font-size: 0.9em; }
+    .state { font-weight: 600; }
+    #log { margin: 0; max-height: 280px; overflow: auto; background: var(--code); border-radius: 8px; padding: 12px; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+    #log .error { color: var(--err); }
+    #log .ok { color: var(--ok); }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+    button.clear { font: inherit; padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--fg); cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Click-to-Call test page</h1>
+    <p class="lede">Webex Calling Customer Assist guest calling. Use the <strong>Call us</strong> button (bottom right) to call your configured queue from this browser.</p>
+
+    <section>
+      <h2>How to test</h2>
+      <ol>
+        <li>Sign an agent of the destination queue in to the Webex App and make them available.</li>
+        <li>Open <strong>Call us</strong>, optionally enter a name, then press <strong>Start call</strong>.</li>
+        <li>Allow the microphone when the browser asks.</li>
+        <li>The agent's Webex App rings with the guest name. Answer it and check two-way audio.</li>
+        <li>Try <strong>Mute</strong>, <strong>Hold</strong>, <strong>Keypad</strong> (for auto attendant menus) and <strong>End call</strong>.</li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="console-h">
+      <div class="row">
+        <h2 id="console-h" style="margin:0">Test console</h2>
+        <span>State: <span class="state" id="state">idle</span></span>
+        <button class="clear" type="button" id="clear">Clear</button>
+      </div>
+      <pre id="log" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <script>
+    // Test-page only: shows the widget's progress events. Not needed on a real site.
+    const logEl = document.getElementById('log');
+    const stateEl = document.getElementById('state');
+    const OK = /granted|loaded|created|registered|connected|Receiving/;
+    window.addEventListener('webex-c2c:log', (e) => {
+      const { time, level, msg } = e.detail;
+      const line = document.createElement('div');
+      line.className = level === 'error' ? 'error' : OK.test(msg) ? 'ok' : '';
+      line.textContent = time.toLocaleTimeString() + '  ' + (level === 'error' ? '✗ ' : '') + msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    });
+    window.addEventListener('webex-c2c:state', (e) => { stateEl.textContent = e.detail.state; });
+    document.getElementById('clear').addEventListener('click', () => { logEl.textContent = ''; });
+  </script>
+  <script src="c2c-widget.js" data-label="Call us" defer></script>
+</body>
+</html>
